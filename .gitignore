@@ -1,0 +1,12 @@
+.pio/
+.vscode/
+host/__pycache__/
+*.pyc
+*.pyo
+*.log
+*.tmp
+*.bin
+*.elf
+*.map
+*.hex
+tmp_*/
