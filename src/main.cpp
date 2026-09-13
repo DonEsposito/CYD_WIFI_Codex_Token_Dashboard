@@ -2,16 +2,14 @@
 #include <ArduinoJson.h>
 #include <TFT_eSPI.h>
 
+#include "hardware_config.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
 
 namespace {
 
-constexpr uint32_t kSerialBaud = 115200;
-constexpr uint8_t kTouchCsPin = 33;
-constexpr uint8_t kBacklightPin = 21;
-constexpr uint8_t kRotation = 1;
 constexpr uint8_t kMaxLimits = 8;
 constexpr uint32_t kStaleAfterMs = 15000;
 constexpr uint32_t kDisconnectedAfterMs = 60000;
@@ -367,18 +365,18 @@ void readSerialLines() {
 } // namespace
 
 void setup() {
-    pinMode(kTouchCsPin, OUTPUT);
-    digitalWrite(kTouchCsPin, HIGH);
+    pinMode(hardware::kTouchCsPin, OUTPUT);
+    digitalWrite(hardware::kTouchCsPin, HIGH);
 
-    Serial.begin(kSerialBaud);
+    Serial.begin(hardware::kSerialBaud);
 
     display.init();
-    display.invertDisplay(true);
-    display.setRotation(kRotation);
+    display.invertDisplay(hardware::kInvertDisplay);
+    display.setRotation(hardware::kDisplayRotation);
 
-    pinMode(kBacklightPin, OUTPUT);
-    ledcAttach(kBacklightPin, 5000, 8);
-    ledcWrite(kBacklightPin, 255);
+    pinMode(hardware::kBacklightPin, OUTPUT);
+    ledcAttach(hardware::kBacklightPin, hardware::kBacklightPwmFrequency, hardware::kBacklightPwmBits);
+    ledcWrite(hardware::kBacklightPin, hardware::kBacklightBrightness);
 
     drawStaticDashboard();
     Serial.println("CYD_CODEX_DASHBOARD_V1 READY");

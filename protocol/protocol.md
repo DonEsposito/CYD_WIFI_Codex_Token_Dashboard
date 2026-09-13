@@ -29,8 +29,8 @@ The host must validate the exact response. USB VID/PID is only a discovery hint.
 - `usedPercent`: integer from 0 through 100.
 - `remainingPercent`: optional integer from 0 through 100. If omitted, firmware uses `100 - usedPercent`.
 - `resetsAt`: Unix timestamp in seconds.
-- `credits.remaining`: optional normalized remaining credit count.
-- `credits.active`: optional boolean. When true, the UI highlights `SOURCE: CREDITS`; otherwise it highlights `SOURCE: PLAN LIMITS`. The host sets this from observed recent credit debits, not from an official app-server active-credit flag.
+- `credits.remaining`: optional normalized remaining credit count. The collector derives it from `credits.balance` in the Codex App Server snapshot.
+- `credits.active`: optional boolean inferred locally by the collector. It becomes true when `Decimal(current balance) < Decimal(previous balance)` and remains true for the configured activity window (120 seconds by default). It is **not** an official service flag. When true, the UI uses magenta for recent credit-debit detection; otherwise plan-limit data uses cyan.
 
 After accepting an update:
 

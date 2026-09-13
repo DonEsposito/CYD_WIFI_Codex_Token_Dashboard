@@ -1,12 +1,23 @@
 .pio/
 .vscode/
-host/__pycache__/
+__pycache__/
 *.pyc
 *.pyo
 *.log
+logs/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
 *.tmp
 *.bin
 *.elf
 *.map
 *.hex
 tmp_*/
+
+# Local media with real account telemetry; use redacted images for publication.
+credits.png
+plan.png
+display.gif

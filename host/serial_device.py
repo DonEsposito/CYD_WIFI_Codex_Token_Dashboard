@@ -16,7 +16,8 @@ from serial.tools.list_ports_common import ListPortInfo
 LOGGER = logging.getLogger(__name__)
 IDENTITY_QUERY = b"WHO_ARE_YOU?\n"
 EXPECTED_IDENTITY = "CYD_CODEX_DASHBOARD_V1"
-PREFERRED_USB_IDS = {(0x1A86, 0x7523)}
+DEFAULT_PREFERRED_VID = 0x1A86
+DEFAULT_PREFERRED_PID = 0x7523
 
 
 @dataclass(frozen=True)
@@ -33,13 +34,17 @@ def _is_bluetooth(port: ListPortInfo) -> bool:
     return "bluetooth" in text or "bthenum" in text
 
 
-def enumerate_candidates(port_override: str | None = None) -> list[Candidate]:
+def enumerate_candidates(
+    port_override: str | None = None,
+    preferred_vid: int | None = DEFAULT_PREFERRED_VID,
+    preferred_pid: int | None = DEFAULT_PREFERRED_PID,
+) -> list[Candidate]:
     ports = list(list_ports.comports())
     if port_override:
         match = next((port for port in ports if port.device.lower() == port_override.lower()), None)
         if match is None:
             return [Candidate(port_override, "manual override", None, None, True)]
-        return [Candidate(match.device, match.description, match.vid, match.pid, True)]
+        return [Candidate(match.device, match.description or "", match.vid, match.pid, True)]
 
     candidates: list[Candidate] = []
     for port in ports:
@@ -49,14 +54,22 @@ def enumerate_candidates(port_override: str | None = None) -> list[Candidate]:
 
         usb_id = (port.vid, port.pid)
         description = (port.description or "").lower()
-        preferred = usb_id in PREFERRED_USB_IDS
-        looks_like_usb_serial = port.vid is not None and any(
-            marker in description for marker in ("ch340", "cp210", "usb serial", "usb-serial", "esp32")
+        preferred = (
+            preferred_vid is not None
+            and preferred_pid is not None
+            and usb_id == (preferred_vid, preferred_pid)
         )
-        if preferred or looks_like_usb_serial:
-            candidates.append(Candidate(port.device, port.description, port.vid, port.pid, preferred))
+        candidates.append(Candidate(port.device, port.description or "", port.vid, port.pid, preferred))
 
-    return sorted(candidates, key=lambda item: (not item.preferred, item.device))
+    markers = ("ch340", "cp210", "usb serial", "usb-serial", "esp32")
+    return sorted(
+        candidates,
+        key=lambda item: (
+            not item.preferred,
+            not any(marker in item.description.lower() for marker in markers),
+            item.device,
+        ),
+    )
 
 
 class DashboardSerial:

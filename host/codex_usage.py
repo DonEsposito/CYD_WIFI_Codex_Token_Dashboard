@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import re
+import shutil
 import subprocess
 import threading
 import time
@@ -23,6 +25,9 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_POLL_SECONDS = 60.0
 DEFAULT_CREDIT_ACTIVE_SECONDS = 120.0
 CODEX_LIMIT_ID = "codex"
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+WINDOWS_USER_PATH_RE = re.compile(r"(?i)\b[A-Z]:\\Users\\[^\\\s\"']+")
+POSIX_USER_PATH_RE = re.compile(r"(?i)(?<!\w)/(?:home|Users)/[^/\s\"']+")
 
 
 class CodexUsageError(RuntimeError):
@@ -40,7 +45,7 @@ class CodexAppServerClient:
     """Small JSON-RPC stdio client for one persistent app-server process."""
 
     def __init__(self, command: list[str] | None = None, request_timeout: float = 20.0):
-        self.command = command or ["codex", "app-server", "--listen", "stdio://"]
+        self.command = command
         self.request_timeout = request_timeout
         self.process: subprocess.Popen[str] | None = None
         self._next_id = 1
@@ -56,16 +61,20 @@ class CodexAppServerClient:
 
         self.close()
         LOGGER.info("Codex app-server started")
-        self.process = subprocess.Popen(
-            self.command,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            bufsize=1,
-        )
+        command = self.command or _default_codex_command()
+        try:
+            self.process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+        except OSError as error:
+            raise CodexUsageError(f"failed to start Codex app-server: {error}") from error
         self._reader_thread = threading.Thread(target=self._read_stdout, name="codex-appserver-stdout", daemon=True)
         self._reader_thread.start()
         self._stderr_thread = threading.Thread(target=self._read_stderr, name="codex-appserver-stderr", daemon=True)
@@ -75,7 +84,7 @@ class CodexAppServerClient:
         result = self.request(
             "initialize",
             {
-                "clientInfo": {"name": "cyd-token-dashboard", "version": "0.1.0"},
+                "clientInfo": {"name": "cyd-token-dashboard", "version": "0.2.0"},
                 "capabilities": {"experimentalApi": True},
             },
         )
@@ -189,7 +198,7 @@ class CodexAppServerClient:
         for line in process.stderr:
             text = line.strip()
             if text:
-                LOGGER.debug("Codex app-server stderr: %s", text)
+                LOGGER.warning("Codex app-server stderr: %s", _sanitize_log_text(text))
 
 
 class CodexUsageProvider:
@@ -352,6 +361,16 @@ def _select_codex_snapshot(result: dict[str, Any]) -> dict[str, Any]:
     raise CodexUsageError("Codex app-server response did not include codex rate limits")
 
 
+def _default_codex_command() -> list[str]:
+    codex = shutil.which("codex.cmd") or shutil.which("codex.exe") or shutil.which("codex")
+    if codex is None:
+        raise CodexUsageError(
+            "Codex CLI was not found on PATH. Install Codex CLI, confirm `codex --version` works "
+            "in this shell, and run the collector again."
+        )
+    return [codex, "app-server", "--listen", "stdio://"]
+
+
 def _normalize_window(limit_id: str, window: dict[str, Any]) -> dict[str, object] | None:
     used = window.get("usedPercent")
     duration = window.get("windowDurationMins")
@@ -366,6 +385,16 @@ def _normalize_window(limit_id: str, window: dict[str, Any]) -> dict[str, object
         "remainingPercent": max(0, 100 - used),
         "resetsAt": resets_at,
     }
+
+
+def _sanitize_log_text(text: str) -> str:
+    text = ANSI_ESCAPE_RE.sub("", text)
+    text = WINDOWS_USER_PATH_RE.sub("[user profile]", text)
+    text = POSIX_USER_PATH_RE.sub("/home/<user>", text)
+    lowered = text.lower()
+    if "token" in lowered or "authorization" in lowered or "bearer" in lowered:
+        return "[redacted app-server stderr]"
+    return text
 
 
 def read_usage() -> dict[str, object] | None:
