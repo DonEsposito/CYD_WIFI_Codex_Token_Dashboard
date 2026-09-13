@@ -16,8 +16,3 @@ venv/
 *.map
 *.hex
 tmp_*/
-
-# Local media with real account telemetry; use redacted images for publication.
-credits.png
-plan.png
-display.gif

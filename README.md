@@ -1,13 +1,22 @@
 # CYD Codex Token Dashboard
 
+<p align="center">
+  <img src="display.gif" alt="CYD Codex Token Dashboard running on an ESP32-2432S028R" width="800">
+</p>
+
+<p align="center">
+  <a href="https://github.com/sponsors/icidade"><img alt="Sponsor" src="https://img.shields.io/github/sponsors/icidade?style=for-the-badge&amp;logo=githubsponsors&amp;logoColor=white&amp;label=Sponsor"></a>
+  <a href="https://github.com/icidade/CYD_Codex_Token_Dashboard/actions/workflows/validate.yml"><img alt="Validate" src="https://img.shields.io/github/actions/workflow/status/icidade/CYD_Codex_Token_Dashboard/validate.yml?branch=main&amp;style=for-the-badge&amp;label=validate&amp;logo=githubactions&amp;logoColor=white"></a>
+  <a href="https://github.com/icidade/CYD_Codex_Token_Dashboard/tags"><img alt="Release" src="https://img.shields.io/github/v/tag/icidade/CYD_Codex_Token_Dashboard?sort=semver&amp;style=for-the-badge&amp;label=release&amp;color=00c8d7"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/icidade/CYD_Codex_Token_Dashboard?style=for-the-badge&amp;color=magenta"></a>
+  <a href="https://github.com/icidade/CYD_Codex_Token_Dashboard"><img alt="Top language" src="https://img.shields.io/github/languages/top/icidade/CYD_Codex_Token_Dashboard?style=for-the-badge&amp;logo=cplusplus&amp;logoColor=white"></a>
+</p>
+
 A tiny cyberpunk hardware dashboard for Codex usage.
 
 ESP32-2432S028R + USB serial + Codex App Server.
 
 **Cyan while using plan limits. Magenta when recent credit burn is detected.**
-
-> **Photo placeholder:** add a redacted dashboard photo here. Never publish a
-> photo or screenshot containing a real credit balance or account data.
 
 This is an unofficial community project and is not affiliated with or endorsed by OpenAI.
 
@@ -17,6 +26,23 @@ The project puts Codex rate-limit windows and recent credit-debit activity on a
 320x240 Cheap Yellow Display (CYD). A small Python process asks the local Codex
 App Server for a usage snapshot, normalizes it, and sends JSON Lines over USB.
 The ESP32 has no network or account access.
+
+## Dashboard modes
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="plan.png" alt="Cyan plan-limits dashboard mode" width="100%"><br>
+      <strong>Plan limits</strong><br>
+      Cyan shows the remaining 5-hour and weekly allowance.
+    </td>
+    <td align="center" width="50%">
+      <img src="credits.png" alt="Magenta recent-credit-debit dashboard mode" width="100%"><br>
+      <strong>Recent credit debit</strong><br>
+      Magenta appears after the collector detects a balance decrease.
+    </td>
+  </tr>
+</table>
 
 ```text
 Codex app-server
@@ -220,8 +246,9 @@ heartbeat behavior, errors, limits, and the complete credit semantics.
 The host communicates only with the local `codex app-server` subprocess. It
 does not read `auth.json`, browser cookies, browser DOM, or private HTTP
 endpoints, and it never sends credentials to the ESP32. Local logs and build
-artifacts are ignored. Before sharing screenshots, redact real balances,
-percentages, timestamps, usernames, paths, hostnames, and account identifiers.
+artifacts are ignored. The included media shows point-in-time dashboard values
+but contains no credentials or account identifiers. Contributors should review
+and redact sensitive information before attaching their own screenshots.
 
 ## Limitations
 
