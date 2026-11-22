@@ -1,4 +1,4 @@
-# CYD Codex Token Dashboard
+# CYD Codex Token Dashboard WiFi
 
 <p align="center">
   <img src="display.gif" alt="CYD Codex Token Dashboard running on an ESP32-2432S028R" width="800">
@@ -12,9 +12,13 @@
   <a href="https://github.com/icidade/CYD_Codex_Token_Dashboard"><img alt="Top language" src="https://img.shields.io/github/languages/top/icidade/CYD_Codex_Token_Dashboard?style=for-the-badge&amp;logo=cplusplus&amp;logoColor=white"></a>
 </p>
 
-A tiny cyberpunk hardware dashboard for Codex usage.
+A tiny cyberpunk hardware dashboard for Codex usage, with **Wi-Fi updates and USB fallback**.
 
-ESP32-2432S028R + USB serial + Codex App Server.
+ESP32-2432S028R + home Wi-Fi (or USB serial) + Windows collector + Codex App Server.
+
+**Wi-Fi mode tested successfully on real hardware (22 November 2026):** the CYD displayed live Codex limits while powered separately from a USB charger. Windows Task Scheduler started the collector automatically. See [Wi-Fi setup and test notes](README_WIFI.md).
+
+This Wi-Fi-enabled version lives on the `feature/wifi-dashboard` branch of a fork; the original upstream project remains unchanged.
 
 **Cyan while using plan limits. Magenta when recent credit burn is detected.**
 
@@ -24,8 +28,7 @@ This is an unofficial community project and is not affiliated with or endorsed b
 
 The project puts Codex rate-limit windows and recent credit-debit activity on a
 320x240 Cheap Yellow Display (CYD). A small Python process asks the local Codex
-App Server for a usage snapshot, normalizes it, and sends JSON Lines over USB.
-The ESP32 has no network or account access.
+App Server for a usage snapshot, normalizes it, and sends JSON over either a private home Wi-Fi connection or USB serial. The ESP32 does not sign in to ChatGPT or use an OpenAI API key.
 
 ## Dashboard modes
 
@@ -50,7 +53,8 @@ Codex app-server
        v
 Python collector
        |
-       | USB Serial
+       | Wi-Fi (HTTP + shared key)
+       | or USB serial
        v
 ESP32 CYD
        |
@@ -63,10 +67,11 @@ Cyberpunk dashboard
 - 5-hour and weekly plan-limit percentages and reset times
 - Optional remaining-credit display
 - Local recent credit-debit detection
-- Serial autodiscovery with identity handshake
+- Wi-Fi delivery over the home LAN (port 8080) with a locally generated shared key
+- USB serial autodiscovery with identity handshake
 - Reconnect, heartbeat, stale/disconnected status, and retained last values
 - Rotating local logs and optional Windows Task Scheduler autostart
-- No Wi-Fi, NTP, touch, SD, Bluetooth, browser scraping, or direct API calls
+- No NTP, touch, SD, Bluetooth, browser scraping, or direct OpenAI API calls
 
 ## Colors and credit semantics
 
@@ -112,6 +117,18 @@ variant may need adjusted pins, driver selection, rotation, or inversion.
 Tested with Python 3.11, Codex CLI `0.118.0`, and the PlatformIO dependencies
 pinned in `platformio.ini`. The App Server is a local interface exposed by the
 Codex CLI and can change between CLI versions.
+
+## Wi-Fi setup (recommended)
+
+The Wi-Fi mode uses a **2.4 GHz** network and a local key; **never commit your actual Wi-Fi password or generated key**. Instructions: [README_WIFI.md](README_WIFI.md).
+
+The CYD connects to Wi-Fi and shows its **actual** address at the bottom of its screen. Use that address (not an example IP) when starting the Windows collector:
+
+```powershell
+python host\collector.py --wifi-host <CYD-IP-ADDRESS> --verbose
+```
+
+After confirming updates, install the autostart task with `-WiFiHost <CYD-IP-ADDRESS>` (see README_WIFI.md). Power the CYD from a USB wall adapter; the Windows PC must remain on and signed in for live data. Reserve the CYD address in your router's DHCP settings to keep it stable.
 
 ## Firmware installation
 
@@ -243,9 +260,7 @@ heartbeat behavior, errors, limits, and the complete credit semantics.
 
 ## Security and privacy
 
-The host communicates only with the local `codex app-server` subprocess. It
-does not read `auth.json`, browser cookies, browser DOM, or private HTTP
-endpoints, and it never sends credentials to the ESP32. Local logs and build
+The host reads usage from its local `codex app-server` subprocess. It does not read `auth.json`, browser cookies, browser DOM, or private OpenAI HTTP endpoints, and it never sends OpenAI login credentials to the ESP32. In Wi-Fi mode it sends only usage snapshots to a local CYD HTTP endpoint, protected by a generated shared key. **LAN traffic is not encrypted; do not port-forward port 8080 or use on untrusted networks.** Local logs and build
 artifacts are ignored. The included media shows point-in-time dashboard values
 but contains no credentials or account identifiers. Contributors should review
 and redact sensitive information before attaching their own screenshots.
@@ -258,6 +273,7 @@ and redact sensitive information before attaching their own screenshots.
   process restarts.
 - Credit balances are normalized to an integer for the current firmware.
 - The included hardware profile targets one common CYD variant; clones differ.
+- Wi-Fi mode requires a reachable private LAN, and its IP may change without a router DHCP reservation.
 
 ## Contributing
 
