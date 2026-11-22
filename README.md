@@ -1,4 +1,14 @@
-# CYD Codex Token Dashboard
+# CYD WiFi Codex Token Dashboard — Wi-Fi-enabled fork
+
+> ✅ **Wi-Fi works on real hardware.** This fork adds wireless Codex usage updates to the standard ESP32-2432S028R Cheap Yellow Display (CYD). Tested on **22 November 2026** with Windows 11: the CYD showed its 5-hour and weekly allowances while powered separately from a USB charger. The Windows collector ran through Task Scheduler.
+>
+> 📶 **Get the working Wi-Fi version:** [`feature/wifi-dashboard` branch](https://github.com/DonEsposito/CYD_WIFI_Codex_Token_Dashboard/tree/feature/wifi-dashboard) · [Wi-Fi setup guide and test results](https://github.com/DonEsposito/CYD_WIFI_Codex_Token_Dashboard/blob/feature/wifi-dashboard/README_WIFI.md).
+>
+> ⚠️ **Important:** The default `main` branch below is still the original **USB-only** firmware. Switch to `feature/wifi-dashboard` before building if you want Wi-Fi. The fork is unofficial and is not affiliated with OpenAI or the original author.
+>
+> **Wi-Fi features:** Private 2.4 GHz LAN transport, USB fallback, shared-key authentication, background Windows collector, and automatic startup. The PC stays signed in to Codex; no OpenAI account credentials are stored on the CYD.
+
+---
 
 <p align="center">
   <img src="display.gif" alt="CYD Codex Token Dashboard running on an ESP32-2432S028R" width="800">
