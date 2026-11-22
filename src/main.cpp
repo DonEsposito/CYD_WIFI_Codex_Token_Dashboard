@@ -4,6 +4,14 @@
 
 #include "hardware_config.h"
 
+// Optional LAN transport. This header is generated locally and never committed.
+#if __has_include("wifi_config.h")
+#include "wifi_config.h"
+#define CYD_WIFI_ENABLED 1
+#include <WiFi.h>
+#include <WebServer.h>
+#endif
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -43,6 +51,12 @@ struct Credits {
 enum class LinkState : uint8_t { Disconnected, Stale, Connected };
 
 TFT_eSPI display;
+#ifdef CYD_WIFI_ENABLED
+constexpr uint16_t kWiFiPort = 8080;
+WebServer wifiServer(kWiFiPort);
+bool wifiServerStarted = false;
+uint32_t lastWifiRetry = 0;
+#endif
 UsageLimit limits[kMaxLimits];
 uint8_t limitCount = 0;
 Credits credits;
@@ -221,7 +235,15 @@ void drawStaticDashboard() {
     display.setTextColor(kMuted, kBackground);
     display.setTextSize(1);
     display.setCursor(12, 229);
+#ifdef CYD_WIFI_ENABLED
+    if (WiFi.status() == WL_CONNECTED) {
+        display.printf("WiFi %s:%u - values retained", WiFi.localIP().toString().c_str(), kWiFiPort);
+    } else {
+        display.print("WiFi connecting - USB backup");
+    }
+#else
     display.print("USB serial - last values retained");
+#endif
 
     lastCountdownSecond = UINT32_MAX;
 }
@@ -362,6 +384,63 @@ void readSerialLines() {
     }
 }
 
+#ifdef CYD_WIFI_ENABLED
+// The shared key authenticates updates on a trusted private network.
+// This endpoint uses unencrypted HTTP; never expose it to the public internet.
+void handleWiFiUsage() {
+    const String suppliedKey = wifiServer.header("X-CYD-Key");
+    if (suppliedKey.length() < 32 || suppliedKey != CYD_WIFI_KEY) {
+        wifiServer.send(403, "application/json", R"({"error":"forbidden"})");
+        return;
+    }
+    const String body = wifiServer.arg("plain");
+    if (body.isEmpty() || body.length() >= kMaxSerialLine) {
+        wifiServer.send(413, "application/json", R"({"error":"invalid_size"})");
+        return;
+    }
+    JsonDocument document;
+    if (deserializeJson(document, body) || strcmp(document["type"] | "", "usage") != 0 || !applyUsage(document)) {
+        wifiServer.send(400, "application/json", R"({"error":"invalid_usage"})");
+        return;
+    }
+    wifiServer.send(200, "application/json", R"({"type":"ack","message":"usage"})");
+}
+
+void beginWiFi() {
+    const char *headers[] = {"X-CYD-Key"};
+    wifiServer.collectHeaders(headers, 1);
+    wifiServer.on("/usage", HTTP_POST, handleWiFiUsage);
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(CYD_WIFI_SSID, CYD_WIFI_PASSWORD);
+}
+
+void pollWiFi() {
+    if (WiFi.status() == WL_CONNECTED) {
+        if (!wifiServerStarted) {
+            wifiServer.begin();
+            wifiServerStarted = true;
+            Serial.printf("WiFi CYD address: %s:%u\n", WiFi.localIP().toString().c_str(), kWiFiPort);
+            drawStaticDashboard();
+            updateCountdownAreas();
+        }
+        wifiServer.handleClient();
+    } else {
+        if (wifiServerStarted) {
+            wifiServer.stop();
+            wifiServerStarted = false;
+            drawStaticDashboard();
+            updateCountdownAreas();
+        }
+        const uint32_t now = millis();
+        if (now - lastWifiRetry >= 15000UL) {
+            lastWifiRetry = now;
+            WiFi.reconnect();
+        }
+    }
+}
+#endif
+
 } // namespace
 
 void setup() {
@@ -380,10 +459,16 @@ void setup() {
 
     drawStaticDashboard();
     Serial.println("CYD_CODEX_DASHBOARD_V1 READY");
+#ifdef CYD_WIFI_ENABLED
+    beginWiFi();
+#endif
 }
 
 void loop() {
     readSerialLines();
+#ifdef CYD_WIFI_ENABLED
+    pollWiFi();
+#endif
     updateCountdownAreas();
 
     const LinkState state = linkState();

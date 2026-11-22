@@ -16,3 +16,7 @@ venv/
 *.map
 *.hex
 tmp_*/
+
+# Local Wi-Fi secrets (never publish)
+/include/wifi_config.h
+/host/.wifi_key

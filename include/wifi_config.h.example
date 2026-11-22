@@ -1,0 +1,6 @@
+#pragma once
+// Example only. Run host/setup_wifi.ps1 to generate wifi_config.h locally.
+// NEVER commit include/wifi_config.h, which contains your home Wi-Fi password.
+#define CYD_WIFI_SSID "YourHomeWifi"
+#define CYD_WIFI_PASSWORD "YourWifiPassword"
+#define CYD_WIFI_KEY "REPLACE_WITH_A_RANDOM_64_CHARACTER_HEX_KEY"

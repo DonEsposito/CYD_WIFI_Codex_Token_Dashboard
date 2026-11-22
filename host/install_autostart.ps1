@@ -1,7 +1,9 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string]$TaskName = "CYD Codex Token Dashboard",
-    [string]$PythonPath = ""
+    [string]$PythonPath = "",
+    [string]$WiFiHost = "",
+    [int]$WiFiPort = 8080
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,6 +47,13 @@ if (Test-Path -LiteralPath $pythonwCandidate) {
 }
 
 $arguments = "`"$collector`" --log-file `"$logFile`""
+if ($WiFiHost) {
+    $keyFile = Join-Path $projectRoot "host\.wifi_key"
+    if (-not (Test-Path -LiteralPath $keyFile)) {
+        throw "Wi-Fi key file not found. Run host\setup_wifi.ps1 first."
+    }
+    $arguments += " --wifi-host `"$WiFiHost`" --wifi-port $WiFiPort --wifi-key-file `"$keyFile`""
+}
 Write-Host "Task name: $TaskName"
 Write-Host "Trigger: at logon for $env:USERDOMAIN\$env:USERNAME"
 Write-Host "Execute: $pythonExe"

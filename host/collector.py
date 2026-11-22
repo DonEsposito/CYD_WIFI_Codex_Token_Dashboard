@@ -11,6 +11,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from codex_usage import CodexUsageError, CodexUsageProvider
+from wifi_device import DashboardWiFi
 from serial_device import (
     DEFAULT_PREFERRED_PID,
     DEFAULT_PREFERRED_VID,
@@ -29,6 +30,10 @@ DEFAULT_LOG_FILE = Path(__file__).resolve().parents[1] / "logs" / "codex-cyd-das
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="CYD Codex dashboard collector")
     parser.add_argument("--port", help="manual COM port override, for example COM9")
+    parser.add_argument("--wifi-host", help="CYD IPv4 address; use Wi-Fi instead of USB when given")
+    parser.add_argument("--wifi-port", type=int, default=8080, help="CYD LAN port (default: 8080)")
+    parser.add_argument("--wifi-key-file", default=str(Path(__file__).parent / ".wifi_key"),
+                        help="local text file containing the dashboard's 64-character secret")
     parser.add_argument("--dry-run", action="store_true", help="read real Codex usage and print sanitized payload")
     parser.add_argument(
         "--poll-interval",
@@ -126,6 +131,8 @@ def main() -> int:
             return 0
 
     try:
+        if args.wifi_host:
+            return run_wifi_forever(args, provider)
         return run_forever(args, provider)
     finally:
         provider.close()
@@ -198,6 +205,61 @@ def run_forever(args: argparse.Namespace, provider: CodexUsageProvider) -> int:
     finally:
         if dashboard is not None:
             dashboard.close()
+    return 0
+
+
+def run_wifi_forever(args: argparse.Namespace, provider: CodexUsageProvider) -> int:
+    """Push normalized Codex usage snapshots to the CYD on private Wi-Fi."""
+    try:
+        key = Path(args.wifi_key_file).read_text(encoding="utf-8-sig").strip()
+        dashboard = DashboardWiFi(args.wifi_host, key, port=args.wifi_port)
+    except (OSError, ValueError) as error:
+        LOGGER.error("Invalid Wi-Fi configuration: %s", error)
+        return 2
+
+    payload = None
+    next_datasource_attempt = 0.0
+    last_send = 0.0
+    datasource_down = False
+    wifi_down = False
+    LOGGER.info("Wi-Fi collector running for %s:%d", args.wifi_host, args.wifi_port)
+    try:
+        while True:
+            now = time.monotonic()
+            if now >= next_datasource_attempt:
+                try:
+                    snapshot = (provider.read_snapshot() if payload is None
+                                else provider.next_snapshot(timeout=0.2))
+                except CodexUsageError as error:
+                    if not datasource_down:
+                        LOGGER.warning("Datasource unavailable: %s", error)
+                        datasource_down = True
+                    next_datasource_attempt = time.monotonic() + DATASOURCE_RETRY_SECONDS
+                else:
+                    if snapshot is not None:
+                        payload = snapshot.payload
+                        if datasource_down:
+                            LOGGER.info("Datasource recovered")
+                            datasource_down = False
+                        last_send = 0.0
+            if payload is not None and (last_send == 0.0 or time.monotonic() - last_send >= HEARTBEAT_SECONDS):
+                fresh = dict(payload)
+                fresh["hostTime"] = int(time.time())
+                try:
+                    dashboard.send_json(fresh)
+                except (OSError, ValueError) as error:
+                    if not wifi_down:
+                        LOGGER.warning("Wi-Fi dashboard unavailable: %s", error)
+                        wifi_down = True
+                else:
+                    if wifi_down:
+                        LOGGER.info("Wi-Fi dashboard reconnected")
+                        wifi_down = False
+                    LOGGER.debug("Wi-Fi usage acknowledged")
+                last_send = time.monotonic()
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        LOGGER.info("Stopped by user")
     return 0
 
 
